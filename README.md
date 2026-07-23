@@ -21,7 +21,8 @@ Total default: **16 container FastHTTP**.
 - `fasthttpctl` menjadi antarmuka operasi terpusat.
 - Playbook memasang Docker, membangun image Go, menjalankan container, dan memverifikasi HTTP 200.
 ---
-##Full Rangkuman deployment
+## Full Rangkuman deployment
+
 Disini Menggunakan FastHTTP-Backend-01 sebagai Deployer
 ```bash
 #Jalankan installer
