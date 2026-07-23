@@ -21,7 +21,46 @@ Total default: **16 container FastHTTP**.
 - `fasthttpctl` menjadi antarmuka operasi terpusat.
 - Playbook memasang Docker, membangun image Go, menjalankan container, dan memverifikasi HTTP 200.
 ---
+##Full Rangkuman deployment
+Disini Menggunakan FastHTTP-Backend-01 sebagai Deployer
+```bash
+#Jalankan installer
+chmod +x install-ansible-system.sh fasthttpctl
+./install-ansible-system.sh
 
+# Konfigurasi user SSH
+nano config/hosts.yml
+
+# Setup keyless SSH manual
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_fasthttp
+ssh-copy-id -i ~/.ssh/id_ed25519_fasthttp.pub ubuntu@10.221.67.69
+ssh-copy-id -i ~/.ssh/id_ed25519_fasthttp.pub ubuntu@10.221.67.148
+ssh-copy-id -i ~/.ssh/id_ed25519_fasthttp.pub ubuntu@10.221.67.124
+ssh-copy-id -i ~/.ssh/id_ed25519_fasthttp.pub ubuntu@10.221.67.68
+
+# Uji Ansible
+./fasthttpctl ping \
+  --private-key ~/.ssh/id_ed25519_fasthttp
+
+# Jalankan deployment
+./fasthttpctl deploy \
+  --private-key ~/.ssh/id_ed25519_fasthttp
+# Jika user membutuhkan password sudo
+./fasthttpctl deploy \
+  --private-key ~/.ssh/id_ed25519_fasthttp \
+  --ask-become-pass
+
+#----
+# Periksa status:
+./fasthttpctl status \
+  --private-key ~/.ssh/id_ed25519_fasthttp
+
+# Periksa statistik
+./fasthttpctl stats \
+  --private-key ~/.ssh/id_ed25519_fasthttp
+
+```
+Untuk lebih lengkapnya ikuti panduan di bawah
 ---
 
 ## 2. Persyaratan
@@ -33,6 +72,8 @@ Total default: **16 container FastHTTP**.
 - akses internet ke PyPI dan Ansible Galaxy;
 - konektivitas TCP/22 ke seluruh VM;
 - konektivitas TCP/8081–8084 untuk verifikasi dari controller.
+- Menngunakan Flavor setiap backend(rekomendasi GP.8C16G).
+- Menggunakan minimal 2 - 4 backen atau lebih.
 
 ### Managed host
 
