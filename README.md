@@ -20,6 +20,9 @@ Total default: **16 container FastHTTP**.
 - SSH keyless disiapkan manual karena user awal VM dapat berbeda: `ubuntu`, `debian`, `root`, `cloud-user`, dan lainnya.
 - `fasthttpctl` menjadi antarmuka operasi terpusat.
 - Playbook memasang Docker, membangun image Go, menjalankan container, dan memverifikasi HTTP 200.
+---
+
+---
 
 ## 2. Persyaratan
 
@@ -39,10 +42,10 @@ Total default: **16 container FastHTTP**.
 - akses internet ke repository Docker, Docker Hub, dan Go module proxy;
 - port 8081–8084 belum dipakai aplikasi lain.
 
-## 3. Ekstrak paket
+## 3. Download Config
 
 ```bash
-unzip fasthttp-ansible-smart-v2.zip
+git clone https://github.com/ica4me/deploy-golang-fasthttp.git fasthttp-ansible-smart
 cd fasthttp-ansible-smart
 chmod +x install-ansible-system.sh fasthttpctl
 ```
