@@ -1,0 +1,15 @@
+FROM {{ go_builder_image }} AS builder
+WORKDIR /src
+
+# Source disalin sebelum go mod tidy agar dependency dari import dapat dihitung
+# dan go.sum dibuat otomatis. Ini memperbaiki error "missing go.sum entry".
+COPY go.mod main.go ./
+RUN go mod tidy && go mod download
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/server ./main.go
+
+FROM {{ runtime_image }}
+RUN addgroup -S app && adduser -S -G app app
+COPY --from=builder /out/server /usr/local/bin/server
+USER app
+EXPOSE {{ backend_internal_port }}
+ENTRYPOINT ["/usr/local/bin/server"]

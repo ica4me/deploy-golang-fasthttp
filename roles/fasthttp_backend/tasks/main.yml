@@ -1,0 +1,119 @@
+---
+- name: Calculate smart CPU policy
+  ansible.builtin.set_fact:
+    total_requested_cpu: "{{ (backend_container_count | int) * (desired_cpus_per_container | float) }}"
+    host_vcpu_count: "{{ ansible_processor_vcpus | default(ansible_processor_count) | int }}"
+    enough_cpu_for_hard_limits: >-
+      {{ (ansible_processor_vcpus | default(ansible_processor_count) | int) >=
+         ((backend_container_count | int) * (desired_cpus_per_container | float)) }}
+
+- name: Show selected CPU policy
+  ansible.builtin.debug:
+    msg: >-
+      Host {{ inventory_hostname }} memiliki {{ host_vcpu_count }} vCPU.
+      Permintaan nominal={{ total_requested_cpu }} vCPU untuk {{ backend_container_count }} container.
+      Mode={{ 'LIMIT 2 vCPU/container' if enough_cpu_for_hard_limits | bool else 'CPU SHARING tanpa hard cap' }}.
+
+- name: Create application directory
+  ansible.builtin.file:
+    path: "{{ app_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Render Go source
+  ansible.builtin.template:
+    src: main.go.j2
+    dest: "{{ app_dir }}/main.go"
+    mode: "0644"
+  register: source_file
+
+- name: Render go.mod
+  ansible.builtin.template:
+    src: go.mod.j2
+    dest: "{{ app_dir }}/go.mod"
+    mode: "0644"
+  register: gomod_file
+
+- name: Render Dockerfile
+  ansible.builtin.template:
+    src: Dockerfile.j2
+    dest: "{{ app_dir }}/Dockerfile"
+    mode: "0644"
+  register: dockerfile_file
+
+- name: Build or rebuild application image
+  community.docker.docker_image:
+    name: "{{ app_image }}"
+    tag: "{{ app_image_tag }}"
+    source: build
+    force_source: "{{ source_file.changed or gomod_file.changed or dockerfile_file.changed }}"
+    build:
+      path: "{{ app_dir }}"
+      pull: true
+      nocache: "{{ source_file.changed or gomod_file.changed or dockerfile_file.changed }}"
+    state: present
+
+- name: Create application Docker network
+  community.docker.docker_network:
+    name: "{{ app_network }}"
+    state: present
+
+- name: Discover existing managed containers
+  ansible.builtin.command: >-
+    docker ps -a --filter name=^/fasthttp-
+    --format {% raw %}'{{.Names}}'{% endraw %}
+  register: existing_managed_containers
+  changed_when: false
+  when: cleanup_orphan_containers | bool
+
+- name: Remove orphan managed containers
+  community.docker.docker_container:
+    name: "{{ item }}"
+    state: absent
+  vars:
+    desired_names: "{{ range(1, (backend_container_count | int) + 1) | map('string') | map('regex_replace', '^', 'fasthttp-') | list }}"
+  loop: "{{ existing_managed_containers.stdout_lines | default([]) }}"
+  when:
+    - cleanup_orphan_containers | bool
+    - item not in desired_names
+
+- name: Deploy FastHTTP containers with adaptive CPU policy
+  community.docker.docker_container:
+    name: "fasthttp-{{ item }}"
+    image: "{{ app_image }}:{{ app_image_tag }}"
+    state: started
+    recreate: true
+    restart_policy: unless-stopped
+    networks:
+      - name: "{{ app_network }}"
+    published_ports:
+      - "0.0.0.0:{{ (backend_first_port | int) + (item | int) - 1 }}:{{ backend_internal_port }}"
+    env:
+      LISTEN_ADDR: ":{{ backend_internal_port }}"
+      NODE_NAME: "{{ inventory_hostname }}"
+      INSTANCE_NAME: "backend-{{ item }}"
+      RESPONSE_TEXT: "200 OK"
+    cpus: "{{ (desired_cpus_per_container | float) if (enough_cpu_for_hard_limits | bool) else omit }}"
+    cpu_shares: "{{ cpu_shares_when_oversubscribed | int }}"
+    log_driver: json-file
+    log_options:
+      max-size: 10m
+      max-file: "3"
+  loop: "{{ range(1, (backend_container_count | int) + 1) | list }}"
+  register: deployed_containers
+
+- name: Verify all local endpoints return HTTP 200
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ (backend_first_port | int) + (item | int) - 1 }}/"
+    status_code: 200
+    return_content: true
+  loop: "{{ range(1, (backend_container_count | int) + 1) | list }}"
+  register: endpoint_checks
+  retries: 15
+  delay: 2
+  until: endpoint_checks is succeeded
+
+- name: Show deployed endpoint responses
+  ansible.builtin.debug:
+    msg: "Port {{ (backend_first_port | int) + (item.item | int) - 1 }} -> {{ item.content | trim }}"
+  loop: "{{ endpoint_checks.results }}"

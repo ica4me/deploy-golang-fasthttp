@@ -1,0 +1,35 @@
+---
+- name: Verify every FastHTTP endpoint locally and from controller
+  hosts: fasthttp_backends
+  become: true
+  gather_facts: false
+  vars:
+    expected_ports: "{{ range(backend_first_port | int, (backend_first_port | int) + (backend_container_count | int)) | list }}"
+  tasks:
+    - name: Verify endpoint from target host
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ item }}/"
+        method: GET
+        status_code: 200
+        return_content: true
+      loop: "{{ expected_ports }}"
+      register: local_checks
+      retries: 10
+      delay: 2
+      until: local_checks is succeeded
+
+    - name: Verify endpoint from Ansible controller
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:{{ item }}/"
+        method: GET
+        status_code: 200
+        return_content: true
+      loop: "{{ expected_ports }}"
+      delegate_to: localhost
+      become: false
+      register: controller_checks
+
+    - name: Show responses
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}:{{ item.item }} -> {{ item.content | trim }}"
+      loop: "{{ controller_checks.results }}"

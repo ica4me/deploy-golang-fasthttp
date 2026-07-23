@@ -1,0 +1,11 @@
+---
+- name: Start all managed FastHTTP containers
+  hosts: fasthttp_backends
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Start containers
+      community.docker.docker_container:
+        name: "fasthttp-{{ item }}"
+        state: started
+      loop: "{{ range(1, (backend_container_count | int) + 1) | list }}"

@@ -1,0 +1,16 @@
+---
+- name: Show centralized FastHTTP status
+  hosts: fasthttp_backends
+  become: true
+  gather_facts: false
+  tasks:
+    - name: List FastHTTP containers
+      ansible.builtin.command: >-
+        docker ps --filter name=fasthttp-
+        --format {% raw %}'{{.Names}}|{{.Status}}|{{.Ports}}|{{.Image}}'{% endraw %}
+      register: docker_status
+      changed_when: false
+
+    - name: Display status
+      ansible.builtin.debug:
+        msg: "{{ docker_status.stdout_lines }}"

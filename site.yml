@@ -1,0 +1,27 @@
+---
+- name: Install Docker and deploy FastHTTP containers
+  hosts: fasthttp_backends
+  become: true
+  gather_facts: true
+  serial: "100%"
+
+  pre_tasks:
+    - name: Validate supported OS family
+      ansible.builtin.assert:
+        that:
+          - ansible_os_family == 'Debian'
+          - ansible_distribution in ['Ubuntu', 'Debian']
+        fail_msg: "Paket ini mendukung Ubuntu/Debian. Host={{ inventory_hostname }}, OS={{ ansible_distribution }} {{ ansible_distribution_version }}"
+
+    - name: Validate container settings
+      ansible.builtin.assert:
+        that:
+          - backend_container_count | int >= 1
+          - backend_first_port | int >= 1
+          - backend_first_port | int + backend_container_count | int - 1 <= 65535
+          - desired_cpus_per_container | float > 0
+        fail_msg: "Konfigurasi container/port/CPU tidak valid di config/hosts.yml"
+
+  roles:
+    - docker_engine
+    - fasthttp_backend

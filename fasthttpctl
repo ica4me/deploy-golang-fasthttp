@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VENV="$ROOT/.venv"
+PB="$VENV/bin/ansible-playbook"
+ANS="$VENV/bin/ansible"
+INV="$VENV/bin/ansible-inventory"
+cd "$ROOT"
+[[ -x "$PB" ]] || { echo "Ansible belum terpasang. Jalankan: ./install-ansible-system.sh" >&2; exit 1; }
+
+cmd="${1:-help}"
+[[ $# -gt 0 ]] && shift || true
+case "$cmd" in
+  deploy|apply) "$PB" site.yml "$@" ;;
+  verify|test) "$PB" playbooks/verify.yml "$@" ;;
+  status|ps) "$PB" playbooks/status.yml "$@" ;;
+  restart) "$PB" playbooks/restart.yml "$@" ;;
+  start) "$PB" playbooks/start.yml "$@" ;;
+  stop) "$PB" playbooks/stop.yml "$@" ;;
+  remove|destroy) "$PB" playbooks/remove.yml "$@" ;;
+  ping|preflight) "$ANS" fasthttp_backends -m ansible.builtin.ping "$@" ;;
+  logs)
+    instance="${1:-1}"
+    [[ "$instance" =~ ^[0-9]+$ ]] || { echo "Nomor instance harus angka." >&2; exit 2; }
+    shift || true
+    "$ANS" fasthttp_backends -b -m ansible.builtin.command \
+      -a "docker logs --tail 100 fasthttp-$instance" "$@"
+    ;;
+  stats) "$ANS" fasthttp_backends -b -m ansible.builtin.command -a "docker stats --no-stream" "$@" ;;
+  inventory) "$INV" --graph "$@" ;;
+  version) "$ANS" --version ;;
+  *)
+    cat <<'HELP'
+Pemakaian: ./fasthttpctl PERINTAH [opsi Ansible]
+
+  ping          Tes koneksi SSH/Python ke seluruh server
+  deploy        Instal/perbarui Docker, image, dan semua container
+  verify        Uji semua endpoint
+  status        Status container seluruh server
+  start         Mulai semua container
+  stop          Hentikan semua container
+  restart       Restart semua container
+  logs [N]      Log instance N dari seluruh server
+  stats         Statistik CPU/RAM container
+  inventory     Tampilkan inventory
+  version       Tampilkan versi Ansible
+  remove        Hapus container, image, dan source aplikasi
+
+Contoh:
+  ./fasthttpctl ping --private-key ~/.ssh/id_ed25519_fasthttp
+  ./fasthttpctl deploy --private-key ~/.ssh/id_ed25519_fasthttp
+  ./fasthttpctl status --limit FastHTTP-Backend-01
+HELP
+    ;;
+esac

@@ -1,0 +1,43 @@
+package main
+
+import (
+    "fmt"
+    "log"
+    "os"
+    "time"
+
+    "github.com/valyala/fasthttp"
+)
+
+func getenv(key, fallback string) string {
+    if value := os.Getenv(key); value != "" {
+        return value
+    }
+    return fallback
+}
+
+func main() {
+    listenAddress := getenv("LISTEN_ADDR", ":8080")
+    nodeName := getenv("NODE_NAME", "unknown-node")
+    instanceName := getenv("INSTANCE_NAME", "unknown-instance")
+    responseText := getenv("RESPONSE_TEXT", "200 OK")
+
+    handler := func(ctx *fasthttp.RequestCtx) {
+        ctx.Response.Header.SetContentType("text/plain; charset=utf-8")
+        ctx.Response.Header.Set("X-Backend-Node", nodeName)
+        ctx.Response.Header.Set("X-Backend-Instance", instanceName)
+        ctx.SetStatusCode(fasthttp.StatusOK)
+        ctx.SetBodyString(fmt.Sprintf("%s | node=%s | instance=%s\n", responseText, nodeName, instanceName))
+    }
+
+    server := &fasthttp.Server{
+        Handler: handler,
+        Name: "FastHTTP-Ansible",
+        ReadTimeout: 5 * time.Second,
+        WriteTimeout: 5 * time.Second,
+        IdleTimeout: 30 * time.Second,
+    }
+
+    log.Printf("starting %s/%s on %s", nodeName, instanceName, listenAddress)
+    log.Fatal(server.ListenAndServe(listenAddress))
+}

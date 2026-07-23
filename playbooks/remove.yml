@@ -1,0 +1,22 @@
+---
+- name: Remove FastHTTP application containers and image
+  hosts: fasthttp_backends
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Remove containers
+      community.docker.docker_container:
+        name: "fasthttp-{{ item }}"
+        state: absent
+      loop: "{{ range(1, (backend_container_count | int) + 1) | list }}"
+
+    - name: Remove application image
+      community.docker.docker_image:
+        name: "{{ app_image }}:{{ app_image_tag }}"
+        state: absent
+      ignore_errors: true
+
+    - name: Remove application directory
+      ansible.builtin.file:
+        path: "{{ app_dir }}"
+        state: absent
