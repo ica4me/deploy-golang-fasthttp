@@ -26,6 +26,7 @@ Total default: **16 container FastHTTP**.
 Disini Menggunakan FastHTTP-Backend-01 sebagai Deployer
 ```bash
 #Jalankan installer
+apt install git -y
 git clone https://github.com/ica4me/deploy-golang-fasthttp.git fasthttp-ansible-smart
 cd fasthttp-ansible-smart
 chmod +x install-ansible-system.sh fasthttpctl
@@ -135,6 +136,7 @@ Untuk lebih lengkapnya ikuti panduan di bawah
 ## 3. Download Config
 
 ```bash
+apt install git -y
 git clone https://github.com/ica4me/deploy-golang-fasthttp.git fasthttp-ansible-smart
 cd fasthttp-ansible-smart
 chmod +x install-ansible-system.sh fasthttpctl
