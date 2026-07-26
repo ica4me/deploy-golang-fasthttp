@@ -26,6 +26,8 @@ Total default: **16 container FastHTTP**.
 Disini Menggunakan FastHTTP-Backend-01 sebagai Deployer
 ```bash
 #Jalankan installer
+git clone https://github.com/ica4me/deploy-golang-fasthttp.git fasthttp-ansible-smart
+cd fasthttp-ansible-smart
 chmod +x install-ansible-system.sh fasthttpctl
 ./install-ansible-system.sh
 
@@ -61,6 +63,52 @@ ssh-copy-id -i ~/.ssh/id_ed25519_fasthttp.pub ubuntu@10.221.67.68
   --private-key ~/.ssh/id_ed25519_fasthttp
 
 ```
+Mengubah jumlah container dan memaksimalkan alokasi CPU
+```bash
+# Ubah Secara Global (Berlaku untuk Semua VM)
+# Misal 10 Container/VM (1 vm 32vCPU)
+# nano config/hosts.yml
+all:
+  vars:
+    ansible_user: ubuntu
+    ansible_python_interpreter: /usr/bin/python3
+    ansible_become: true
+    ansible_become_method: sudo
+    
+    # 1. Ubah jumlah container di sini
+    backend_container_count: 10
+    
+    # Port awal (otomatis menjadi 8081-8090)
+    backend_first_port: 8081
+    backend_internal_port: 8080
+    
+    # 2. Maksimalkan CPU (32 vCPU dibagi 10 container = 3.2)
+    desired_cpus_per_container: 3.2
+    
+    cpu_shares_when_oversubscribed: 1024
+    # ... sisa konfigurasi lainnya ...
+
+```
+```bash
+# Ubah Spesifik per VM (Override)
+# nano config/hosts.yml
+
+children:
+    fasthttp_backends:
+      hosts:
+        # VM 1: 32 vCPU untuk 10 container (port 8081-8090)
+        FastHTTP-Backend-01:
+          ansible_host: 10.221.67.69
+          backend_container_count: 10
+          desired_cpus_per_container: 3.2
+
+        # VM 2: 16 vCPU untuk 8 container (port 8081-8088)
+        FastHTTP-Backend-02:
+          ansible_host: 10.221.67.148
+          backend_container_count: 8
+          desired_cpus_per_container: 2.0
+```
+
 Untuk lebih lengkapnya ikuti panduan di bawah
 ---
 
